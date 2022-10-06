@@ -10,6 +10,7 @@
   const resultsContainer = document.querySelector('#book-search-hits');
   const results = document.querySelector('#book-search-results ul');
   const LIMIT_RESULTS = 5
+  const documents = new Map()
 
   if (!input) {
     return
@@ -60,33 +61,17 @@
     fetch(searchDataURL)
       .then(pages => pages.json())
       .then(pages => {
-        window.bookSearchIndex = new FlexSearch.Document({
-          tokenize: 'forward',
-          optimize: true,
-          resolution: 9,
-          document: {
-            id: 'id',
-            index: [{
-              field: 'title',
-              tokenize: "forward",
-              optimize: true,
-              resolution: 9
-            }, {
-              field: 'content',
-              tokenize: "forward",
-              optimize: true,
-              resolution: 2
-            }, {
-              field: 'href',
-              optimize: true,
-              resolution: 5
-            }],
-            store: true,
+        window.lunrIdx = lunr(function() {
+          this.ref('id')
+          this.field('id')
+          this.field('content')
+          this.field('href')
+          this.metadataWhitelist = ['position']
+          for (const page of pages) {
+            documents.set(page.id, page)
+            this.add(page);
           }
-        });
-        for (const page of pages) {
-          window.bookSearchIndex.add(page);
-        }
+        })
       })
       .then(() => input.required = false)
       .then(search);
@@ -101,59 +86,72 @@
       results.removeChild(results.firstChild);
     }
 
-    if (!input.value) {
+    if (!input.value || input.value.length < 3) {
       hideSearchBox()
       return;
     }
-
-    const searchHits = window.bookSearchIndex.search(input.value, { enrich: true, limit: LIMIT_RESULTS });
-    const searchHitsParsed = []
-    const ids = new Set()
-
-    for (const hit of searchHits) {
-      for (const result of hit.result) {
-        if (searchHitsParsed.length >= LIMIT_RESULTS) {
-          break
-        }
-        if (ids.has(result.id)) {
-          continue
-        }
-        ids.add(result.id)
-        searchHitsParsed.push(result.doc)
-      }
+    function searchValue(fuzzy) {
+      return input.value.split(' ').map(val => {
+        if (val.length <= 4 || !fuzzy) return `+${val}`
+        return `+${val}~1`
+      }).join(' ')
     }
-
-    if (!searchHitsParsed.length) {
+    function getSearchHits() {
+      const hits = window.lunrIdx.search(searchValue()).slice(0, LIMIT_RESULTS);
+      if (hits.length) return hits
+      return window.lunrIdx.search(searchValue(true)).slice(0, LIMIT_RESULTS);
+    }
+    const searchHits = getSearchHits()
+    if (!searchHits.length) {
       hideSearchBox()
       // TODO: show not found
       return
     }
     showSearchBox()
-    searchHitsParsed.forEach(function (page) {
+    searchHits.forEach(function (hit) {
+      const document = documents.get(Number(hit.ref))
+      if (!document) return
       const li = element('<li><a href><h4></h4><span></span></a></li>');
       const a = li.querySelector('a');
       const title = li.querySelector('h4');
       const content = li.querySelector('span');
 
-      a.href = page.href;
-      title.textContent = page.title;
-      content.innerHTML = highlightContent(page.content, input.value)
+      a.href = document.href;
+      title.textContent = document.title;
+      content.innerHTML = highlightContent(document.content, hit)
       results.appendChild(li);
     });
   }
 
-  function highlightContent(content, searchKeyword) {
-    const amountLetters = 100
-    const regex = new RegExp(searchKeyword.split(' ')[0], 'gi')
-    const searchIndex = content.search(regex)
-
-    if (searchIndex === -1) {
-      return content.slice(0, amountLetters)
+  function highlightContent(content, hit) {
+    const amountLetters = 60
+    const { metadata } = hit.matchData
+    let from = 0
+    let to = 100
+    const keys = Object.keys(metadata).sort()
+    for (const key of keys) {
+      const positions = metadata[key]?.content?.position
+      if (!positions) {
+        continue
+      }
+      for (const position of positions) {
+        const positionStart = position[0]
+        from = Math.max(0, content.length - positionStart <= amountLetters
+          ? positionStart - amountLetters * 2
+          : positionStart - amountLetters)
+        to = positionStart + position[1] + amountLetters
+      }
+      break
+    }
+    let value = content.slice(from, to)
+    if (from !== 0) {
+      value = `...${value}`
+    }
+    for (const key of keys) {
+      value = value.replace(new RegExp(key, 'gi'), '<strong>$&</strong>')
     }
 
-    const from = Math.max(0, searchIndex - 40)
-
-    return content.slice(from, from ? searchIndex + amountLetters : amountLetters).replace(regex, '<strong>$&</strong>')
+    return value + '...'
   }
 
   // HELPERS
