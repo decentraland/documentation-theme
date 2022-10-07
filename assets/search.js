@@ -5,11 +5,12 @@
 
 (function () {
   const searchDataURL = '{{ $searchData.RelPermalink }}';
-  const input = document.querySelector('#book-search-input');
+  const input = document.querySelector('#book-search-input input');
   const searchOverlay = document.querySelector('#search-overlay')
   const resultsContainer = document.querySelector('#book-search-hits');
   const results = document.querySelector('#book-search-results ul');
-  const LIMIT_RESULTS = 5
+  const LIMIT_RESULTS = Infinity
+  const MIN_INPUT_SIZE = 2 // SDK ✅
   const documents = new Map()
 
   if (!input) {
@@ -78,6 +79,7 @@
   }
 
   function search() {
+    const value = input.value?.trim()
     if (input.required) {
       return
     }
@@ -86,41 +88,51 @@
       results.removeChild(results.firstChild);
     }
 
-    if (!input.value || input.value.length < 3) {
+    if (!value || value.length <= MIN_INPUT_SIZE) {
       hideSearchBox()
       return;
     }
+
     function searchValue(fuzzy) {
-      return input.value.split(' ').map(val => {
+      // Operators:
+      // +: means AND. i.e +sdk +metaverse will found words that contains sdk & metaverse
+      // ~n: looks for N fuzzy words. i.e. metaverse~1 => metavese ✅
+      return value.split(' ').map(val => {
+        // Avoid blankspaces
+        if (!val) return
+        // if its a short word or fuzzy option is turned off, then return only the value with the +operator
         if (val.length <= 4 || !fuzzy) return `+${val}`
+
         return `+${val}~1`
-      }).join(' ')
+      }).filter(a => !!a).join(' ')
     }
+
     function getSearchHits() {
+      // First search for the words without fuzzy, so we can have a more accurate result.
       const hits = window.lunrIdx.search(searchValue()).slice(0, LIMIT_RESULTS);
       if (hits.length) return hits
       return window.lunrIdx.search(searchValue(true)).slice(0, LIMIT_RESULTS);
     }
     const searchHits = getSearchHits()
+    showSearchBox()
     if (!searchHits.length) {
-      hideSearchBox()
-      // TODO: show not found
+      resultCard(`Not Found`, `Sorry, we couldn't find any matches. Try searching for a different keyword`)
       return
     }
-    showSearchBox()
-    searchHits.forEach(function (hit) {
+    searchHits.forEach((hit) => {
       const document = documents.get(Number(hit.ref))
       if (!document) return
-      const li = element('<li><a href><h4></h4><span></span></a></li>');
-      const a = li.querySelector('a');
-      const title = li.querySelector('h4');
-      const content = li.querySelector('span');
-
-      a.href = document.href;
-      title.textContent = document.title;
-      content.innerHTML = highlightContent(document.content, hit)
-      results.appendChild(li);
+      const highlightedContent = highlightContent(document.content, hit)
+      resultCard(document.title, highlightedContent, document.href)
     });
+  }
+
+  function resultCard(title, content, href) {
+    const li = element('<li><a href><h4></h4><span></span></a></li>');
+    if (href) li.querySelector('a').href = href;
+    li.querySelector('h4').textContent = title;
+    li.querySelector('span').innerHTML = content
+    results.appendChild(li);
   }
 
   function highlightContent(content, hit) {
@@ -174,6 +186,10 @@
   }
 
   function showSearchBox() {
+    if (!resultsContainer.classList.contains('hidden')) {
+      return
+    }
+    resultsContainer.scrollTop = 0
     show(searchOverlay)
     show(resultsContainer)
   }

@@ -248,6 +248,15 @@ body[dir="rtl"] .book-menu {
   position: relative;
   margin: $padding-16 0;
   border-bottom: 1px solid transparent;
+  #book-search-input {
+    display: flex;
+    align-items: center;
+    img {
+      z-index: 5;
+      position: absolute;
+      left: 30px;
+    }
+  }
   #search-overlay {
     background-color: #000;
     pointer-events: auto;
@@ -263,11 +272,12 @@ body[dir="rtl"] .book-menu {
     position: absolute;
     z-index: 3;
     #book-search-hits {
+      overflow-y: scroll;
+      max-height: calc(100vh - 130px); // 130px -> uitopbar + content topbar
       background-color: var(--body-background);
       border-radius: 10px;
       box-shadow: 0 16px 32px 16px rgba(0, 0, 0, 0.16);
       margin-top: 5px;
-      overflow: hidden;
       padding: 16px;
       position: relative;
       ul {
