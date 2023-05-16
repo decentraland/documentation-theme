@@ -119,22 +119,35 @@
       resultCard(`Not Found`, `Sorry, we couldn't find any matches. Try searching for a different keyword`)
       return
     }
+    const currentPathname = window.location.pathname
+
     searchHits.forEach((hit) => {
       const document = documents.get(Number(hit.ref))
       if (!document) return
+      if ((isSdk6(currentPathname) && isSdk7(document.href))
+        || (isSdk7(currentPathname) && isSdk6(document.href))
+      ) return
       const highlightedContent = highlightContent(document.content, hit)
       resultCard(document.title, highlightedContent, document.href)
     });
   }
 
+  function isSdk6(href) {
+    return href && href.includes('creator/development-guide') && !href.includes('sdk7')
+  }
+
+  function isSdk7(href) {
+    return href && href.includes('creator/development-guide') && href.includes('sdk7')
+  }
+
   function resultCard(title, content, href) {
-    const li = element('<li><a href><h4></h4><span></span></a></li>');
+    const li = element('<li><a href><p></p><><span></span></a></li>');
     if (href) li.querySelector('a').href = href;
     const sdk6 = href && href.includes('creator/development-guide') && !href.includes('sdk7') && ' [SDK 6]'
     const sdk7 = href && href.includes('creator/development-guide') && href.includes('sdk7') && ' [SDK 7]'
     const extraTitle = sdk6 || sdk7 || ''
-    li.querySelector('h4').textContent = title + extraTitle;
     li.querySelector('span').innerHTML = content
+    li.querySelector('p').innerHTML = `<span style="font-size: 18px; font-weight: 700;">${title}</span>${extraTitle}`
     results.appendChild(li);
   }
 
