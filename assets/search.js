@@ -137,17 +137,17 @@
   }
 
   function isSdk7(href) {
-    return href && href.includes('creator/development-guide') && href.includes('sdk7')
+    return href && href.includes('creator/development-guide/sdk7')
   }
 
   function resultCard(title, content, href) {
     const li = element('<li><a href><p></p><span></span></a></li>');
     if (href) li.querySelector('a').href = href;
-    const sdk6 = href && href.includes('creator/development-guide') && !href.includes('sdk7') && ' [SDK 6]'
-    const sdk7 = href && href.includes('creator/development-guide') && href.includes('sdk7') && ' [SDK 7]'
-    const extraTitle = sdk6 || sdk7 || ''
+    const sdk6 = isSdk6(href) && ' [SDK 6]'
+    const sdk7 = isSdk7(href) && ' [SDK 7]'
+    const sdkContext = sdk6 || sdk7 || ''
     li.querySelector('span').innerHTML = content
-    li.querySelector('p').innerHTML = `<span style="font-size: 18px; font-weight: 700;">${title}</span>${extraTitle}`
+    li.querySelector('p').innerHTML = `<span style="font-size: 18px; font-weight: 700;">${title}</span>${sdkContext}`
     results.appendChild(li);
   }
 
