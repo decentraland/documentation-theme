@@ -141,7 +141,7 @@
   }
 
   function resultCard(title, content, href) {
-    const li = element('<li><a href><p></p><><span></span></a></li>');
+    const li = element('<li><a href><p></p><span></span></a></li>');
     if (href) li.querySelector('a').href = href;
     const sdk6 = href && href.includes('creator/development-guide') && !href.includes('sdk7') && ' [SDK 6]'
     const sdk7 = href && href.includes('creator/development-guide') && href.includes('sdk7') && ' [SDK 7]'
